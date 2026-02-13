@@ -5,14 +5,18 @@ from langchain_core.messages import HumanMessage
 import base64
 import json
 import io
+import re
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="ComptaSnap Pro", page_icon="📊", layout="wide")
 
 # --- CONFIGURATION IA (GROQ) ---
-# Assure-toi que GROQ_API_KEY est bien dans tes Secrets Streamlit
-GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-model = ChatGroq(model_name="llama-3.2-11b-vision-preview", groq_api_key=GROQ_API_KEY)
+try:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    model = ChatGroq(model_name="llama-3.2-11b-vision-preview", groq_api_key=GROQ_API_KEY)
+except Exception as e:
+    st.error("Clé API manquante ou mal configurée dans les Secrets Streamlit.")
+    st.stop()
 
 # --- INTERFACE PROFESSIONNELLE ---
 st.title("📊 ComptaSnap Pro")
@@ -37,20 +41,21 @@ if uploaded_file:
         if st.button("🚀 Extraire les données vers Excel"):
             with st.spinner("Analyse intelligente en cours..."):
                 try:
-                    # Encodage de l'image pour l'IA Vision
+                    # Encodage de l'image
                     image_base64 = encode_image(uploaded_file.getvalue())
                     
-                    # Le Prompt pour forcer l'extraction structurée
+                    # Prompt optimisé pour éviter les erreurs
                     prompt = """
-                    Analyse cette image de facture. 
-                    Extrais UNIQUEMENT les infos suivantes au format JSON pur :
+                    Analyse cette image. 
+                    Extrais les infos suivantes au format JSON uniquement. 
+                    Structure attendue :
                     {
-                        "fournisseur": "nom de l'entreprise",
+                        "fournisseur": "nom",
                         "date": "JJ/MM/AAAA",
                         "HT": 0.0,
                         "TVA": 0.0,
                         "TTC": 0.0,
-                        "devise": "XOF/EUR/USD"
+                        "devise": "XOF"
                     }
                     Ne réponds rien d'autre que le JSON.
                     """
@@ -63,36 +68,41 @@ if uploaded_file:
                     )
                     
                     response = model.invoke([msg])
-                    
-                    # Nettoyage et lecture du JSON reçu
-                    clean_content = response.content.replace('```json', '').replace('```', '').strip()
-                    data_dict = json.loads(clean_content)
-                    
-                    # Création du tableau de données (DataFrame)
-                    df = pd.DataFrame([data_dict])
-                    
-                    st.success("✅ Analyse terminée !")
-                    st.table(df) # Affichage du résultat à l'écran
-                    
-                    # Préparation du fichier Excel en mémoire
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df.to_excel(writer, index=False, sheet_name='ComptaSnap_Extract')
-                    
-                    # Bouton de téléchargement
-                    st.download_button(
-                        label="📥 Télécharger le fichier Excel",
-                        data=output.getvalue(),
-                        file_name=f"Facture_{data_dict['fournisseur']}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                    st.balloons()
+                    full_text = response.content
+
+                    # --- NETTOYAGE DU JSON (LA CORRECTION) ---
+                    # On cherche le premier '{' et le dernier '}' pour isoler le JSON
+                    match = re.search(r'\{.*\}', full_text, re.DOTALL)
+                    if match:
+                        json_str = match.group()
+                        data_dict = json.loads(json_str)
+                        
+                        # Création du DataFrame
+                        df = pd.DataFrame([data_dict])
+                        
+                        st.success("✅ Analyse terminée !")
+                        st.table(df)
+                        
+                        # Génération Excel
+                        output = io.BytesIO()
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                            df.to_excel(writer, index=False, sheet_name='Extraction')
+                        
+                        st.download_button(
+                            label="📥 Télécharger le fichier Excel",
+                            data=output.getvalue(),
+                            file_name=f"Facture_{data_dict.get('fournisseur', 'Inconnu')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                        st.balloons()
+                    else:
+                        st.error("L'IA n'a pas renvoyé un format de données valide. Réessayez.")
+                        st.write("Réponse brute de l'IA :", full_text)
 
                 except Exception as e:
-                    st.error("Désolé, l'IA n'a pas pu lire correctement cette image. Réessayez avec une photo plus nette.")
-                    # Optionnel pour debug : st.write(e)
+                    st.error(f"Erreur technique : {str(e)}")
 
 # --- PIED DE PAGE ---
 st.sidebar.markdown("---")
-st.sidebar.write("💳 **Version Pro**")
-st.sidebar.caption("Développé pour simplifier la vie des entrepreneurs.")
+st.sidebar.write("💳 **Version Pro v1.1**")
+st.sidebar.caption("Système d'extraction intelligent.")
