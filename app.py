@@ -8,12 +8,14 @@ from PIL import Image
 # --- CONFIGURATION ---
 st.set_page_config(page_title="ComptaSnap Pro", page_icon="📊")
 
+# Remplace l'ancienne ligne par celle-ci
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=GOOGLE_API_KEY)
+    # On utilise 'gemini-1.5-flash' (nom standard)
     model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.error("Configurez la clé GOOGLE_API_KEY dans les Secrets.")
+except Exception as e:
+    st.error(f"Erreur de configuration : {e}")
     st.stop()
 
 st.title("📊 ComptaSnap Pro")
