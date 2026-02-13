@@ -1,0 +1,6 @@
+.streamlit/
+__pycache__/
+*.pdf
+*.jpg
+*.jpeg
+*.png
