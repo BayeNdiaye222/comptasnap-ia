@@ -13,8 +13,8 @@ st.set_page_config(page_title="ComptaSnap Pro", page_icon="📊", layout="wide")
 # --- CONFIGURATION IA (GROQ) ---
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-    # Mise à jour vers le modèle 90b qui remplace la version dépréciée
-    model = ChatGroq(model_name="llama-3.2-90b-vision-preview", groq_api_key=GROQ_API_KEY)
+    # Utilisation du modèle stable de production
+    model = ChatGroq(model_name="llama-3.2-11b-vision-instant", groq_api_key=GROQ_API_KEY)
 except Exception as e:
     st.error("Clé API manquante ou mal configurée dans les Secrets Streamlit.")
     st.stop()
